@@ -6,11 +6,26 @@ import java.util.LinkedList;
 /**
  * Класс-хранилище плейлиста с музыкой и полями.
  */
-public class Playlist {
+public class Playlist /*extends Thread */{
     private LinkedList<Track> tracks = new LinkedList<>();
+    private int playind = 0;
+
+    public void setPlayind(int lastid) {
+        this.playind = lastid;
+    }
 
     public int size() {
         return tracks.size();
+    }
+
+    public void Play() {
+        //for (int i = playind; i < tracks.size(); i++) {
+        int i = playind;
+            if (tracks.get(i).getInstance().isRunning()) {
+                tracks.get(i).getInstance().close();
+            }
+            tracks.get(i).start();
+        //}
     }
 
     /**
@@ -19,8 +34,8 @@ public class Playlist {
      * Не хотелось бы несколько раз открывать и закрывать поток только чтоб узнать duration...
      * ? правильно ли, что мы здесь открываем instance в потоке?
      */
-    static class Track {
-        private final String path;
+    static class Track extends Thread{
+        private String path;
         private long duration;
         private Clip instance;
 
@@ -33,6 +48,17 @@ public class Playlist {
                 instance.open(audioInputStream);
                 setDuration(instance.getMicrosecondLength()/1000);
             } catch (LineUnavailableException | UnsupportedAudioFileException | IOException e) {
+                System.err.println(e.getMessage());
+            }
+
+        }
+
+        @Override
+        public void run() {
+            try {
+                instance.start();
+                Track.sleep(duration);
+            } catch (InterruptedException e) {
                 System.err.println(e.getMessage());
             }
         }
@@ -80,12 +106,27 @@ public class Playlist {
         }
     }
 
+
+    /*
+    Закрываем все потоки, а чё
+     */
+    public void pause() {
+        for (Track track : tracks) {
+            track.instance.close();
+        }
+    }
+    public void pause(int ind) {
+        tracks.get(ind).instance.close();
+    }
+
     /**
     @TODO сделать промежуток между играемыми подряд файлами
      */
     public void play(int number) {
         try {
             for (int i = number; i < tracks.size(); i += 1) {
+
+                //tr.start();
                 Track t = tracks.get(i);
                 t.getInstance().start();
                 Thread.sleep(t.getDuration());
