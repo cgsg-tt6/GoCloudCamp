@@ -5,29 +5,40 @@ import java.util.LinkedList;
 
 /**
  * Класс-хранилище плейлиста с музыкой и полями.
- * Наверное, нужно сделать типо вложенный класс, который реализует тип Track.
- * Ваще-то все функции типо play, loop можно было написать тут, а класс Sound выкинуть.
  */
 public class Playlist {
     private LinkedList<Track> tracks = new LinkedList<>();
 
+    public int size() {
+        return tracks.size();
+    }
+
     /**
-     * Ваще можно сделать внутренним классом Playlist
-     * Но так как нам надо передавать в качестве параметра в Main для недефолтного конструктора плейлиста треки,
-     * то нужно чтоб класс Track был доступен и в Main
-     * Хотя что нам мешает.. написать Playlist.Track(...)
-     * Либо по дефолту создавать пустой плейлист, а добаблять туда треки через add,
-     * а в параметрах add передавать то, что уже внутри add делать объектом типа Track
-     * -------------------------------------------------------
      * Возможно, у трека должен быть экземпляр типа Clip или в том роде
+     * а то Track чисто хранит инфу о треке (path и duration), но не сам трек.
+     * Не хотелось бы несколько раз открывать и закрывать поток только чтоб узнать duration...
+     * ? правильно ли, что мы здесь открываем instance в потоке?
      */
     static class Track {
         private final String path;
-        // duration заполняется только если для этого трека был вызван метод Play
         private long duration;
+        private Clip instance;
 
         public Track(String path_name) {
             path = path_name;
+            try {
+                File f = new File(path);
+                AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(f.toURI().toURL());
+                instance = AudioSystem.getClip();
+                instance.open(audioInputStream);
+                setDuration(instance.getMicrosecondLength()/1000);
+            } catch (LineUnavailableException | UnsupportedAudioFileException | IOException e) {
+                System.err.println(e.getMessage());
+            }
+        }
+
+        public Clip getInstance() {
+            return instance;
         }
 
         public String getPath() {
@@ -56,17 +67,30 @@ public class Playlist {
         tracks.add(track1);
     }
 
-    public void play(int number) {
+    /**
+     * Функция, проигрывающая только данный трек
+     */
+    public void play(int number, boolean a) {
         try {
-            File f = new File(tracks.get(number).getPath());
-            AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(f.toURI().toURL());
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioInputStream);
-            clip.start();
-            tracks.get(number).setDuration(clip.getMicrosecondLength()/1000);
+            tracks.get(number).getInstance().start();
             Thread.sleep(tracks.get(number).getDuration());
         }
-        catch (IOException | LineUnavailableException | UnsupportedAudioFileException | InterruptedException e) {
+        catch (InterruptedException e) {
+            System.err.println(e.getMessage());
+        }
+    }
+
+    /**
+    @TODO сделать промежуток между играемыми подряд файлами
+     */
+    public void play(int number) {
+        try {
+            for (int i = number; i < tracks.size(); i += 1) {
+                Track t = tracks.get(i);
+                t.getInstance().start();
+                Thread.sleep(t.getDuration());
+            }
+        } catch (InterruptedException e) {
             System.err.println(e.getMessage());
         }
     }
